@@ -8,12 +8,12 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 \usepackage{placeins}
-\setlist{itemsep=2pt,topsep=4pt}
+\setlist{itemsep=0pt,topsep=2pt}
 
 \newcommand{\src}{\mathcal{S}}
 \newcommand{\tgt}{\mathcal{T}}
 
-\title{Mind the Touch Gap:\\Real-to-Sim Contact Alignment\\for Dexterous Pen Spinning}
+\title{{\Large Mind the Touch Gap: Real-to-Sim Contact\\Alignment for Dexterous Pen Spinning}}
 \hypersetup{pdftitle={Mind the Touch Gap: Real-to-Sim Contact Alignment for Dexterous Pen Spinning},pdfauthor={Xinyao Li, Wen-Han Hsieh, Seungjae Baek, Shuai Zhou, Yuan Li, Yusu Fang},pdfsubject={16-831 Fall 2026 Course Project Proposal}}
 \author{
   Xinyao Li\\{\normalfont\small xinyaol2}\\{\normalfont\small\texttt{xinyaol2@andrew.cmu.edu}}
@@ -33,29 +33,29 @@
 \maketitle
 
 \begin{abstract}
-Contact-rich, dynamic in-hand skills such as pen spinning remain difficult to transfer from simulation. PenSpin~\citep{wang2024penspin} improved its hardware performance by fine-tuning a proprioceptive student on a small set of successful open-loop replays. We ask whether the same limited target experience can instead improve the contact observations used during simulator training. We propose to replay source actions in a target simulator, learn a mapping from source link-level contact to target contact, freeze that mapping in the source simulator, and re-distill a contact-aware student. Isaac Gym~\citep{makoviychuk2021isaac} supplies source training; Project SuperDex~\citep{superdex2026} supplies a controlled target with observable contacts. We compare against the original proprio-only student, raw-contact training, randomized contact, simple calibration, and PenSpin-style target fine-tuning. This sim-to-sim proxy tests the value of contact-observation alignment; it does not claim to correct contact dynamics or establish hardware transfer.
+Pen spinning is fast and contact-rich, making simulation transfer difficult. PenSpin~\citep{wang2024penspin} fine-tuned a proprioceptive student on successful hardware replays. We ask whether a small replay budget can instead align the contact observations used during simulator training. Using Isaac Gym~\citep{makoviychuk2021isaac} and Project SuperDex~\citep{superdex2026}, we propose to learn a source-to-target contact mapper, re-distill a contact-aware student, and test it against proprio-only, raw-contact, randomized-contact, calibrated-contact, and target-fine-tuning baselines. This sim-to-sim study tests the value of contact-observation alignment without claiming to correct dynamics or establish hardware transfer.
 \end{abstract}
 \keywords{Dexterous manipulation, contact alignment, sim-to-sim transfer}
 
 % ===========================================================================
 \section{Introduction}
 
-Simulation-based reinforcement learning has enabled in-hand manipulation skills that are hard to teleoperate~\citep{qi2022hora,openai2020dexterous,qi2023general}. Pen spinning is a demanding case: it is fast, contact-rich, and unforgiving of small timing errors. PenSpin~\citep{wang2024penspin} trained a privileged oracle and distilled a student using proprioception alone. Its sim-trained student did not transfer reliably to hardware, even after substantial simulation work.
+Simulation-based learning has enabled dexterous in-hand skills~\citep{qi2022hora,openai2020dexterous,qi2023general}, but rapid contact changes still impede transfer. PenSpin~\citep{wang2024penspin} trained a privileged oracle and a proprio-only student; the student did not transfer reliably to hardware.
 
-PenSpin's adaptation replayed oracle actions open-loop on hardware, retained successful trajectories, and fine-tuned the student. This uses little target data, but it adapts a particular policy rather than improving the contact observations available in the training simulator. We investigate whether replay data can be used at the observation level, so a policy can continue learning from target-like touch cues in the source simulator.
+PenSpin then fine-tuned the student on successful open-loop hardware replays. We instead ask whether the same limited target experience can improve the \emph{contact observations} used for training, so a student can learn from target-like touch cues in the source simulator.
 
-Prior work has adapted simulator parameters from target experience~\citep{chebotar2019closing,he2025asap,ramos2019bayessim}, and recent work has calibrated tactile simulation through replay~\citep{real2sim2real2026}. Our proposed intervention is narrower: it aligns a policy's contact input while leaving the source collision solver, friction, and object motion unchanged. Because PenSpin's original student has no contact input, we explicitly add a contact-aware student and retain the original proprio-only student as a baseline.
+Prior work adapts simulator parameters from target experience~\citep{chebotar2019closing,he2025asap,ramos2019bayessim} or calibrates tactile simulation through replay~\citep{real2sim2real2026}. Our intervention aligns only the policy's contact input; the source collision solver and dynamics remain unchanged. Because PenSpin's student had no contact input, we add a contact-aware student and retain the original as a baseline.
 
-We evaluate this idea in a sim-to-sim setting, with Isaac Gym as the source and SuperDex~\citep{superdex2026} as the target. The target simulator permits contact labels and controlled resets that are difficult to obtain on hardware. We can vary friction and compliance, measure state divergence during paired replays, and evaluate every policy on matched target initial states. The setting is a controlled proxy, not a real-world result.
+We use Isaac Gym as the source and SuperDex~\citep{superdex2026} as the target. SuperDex provides contact labels and controlled resets, allowing matched target tests and friction/compliance changes. This is a controlled proxy rather than a hardware result.
 
 We ask three questions:
 \begin{enumerate}[label=\textbf{RQ\arabic*:},leftmargin=*]
-  \item Under changes in target friction and compliance, when does a contact input help or hurt transfer relative to proprioception alone?
-  \item How much target performance does a learned contact observation mapping recover from a small replay dataset?
-  \item How does observation alignment compare with target-policy fine-tuning at the same number of replay attempts?
+  \item When does contact help or hurt transfer under friction and compliance shifts?
+  \item How much can a small replay-trained contact mapper improve target performance?
+  \item At equal replay attempts, how does alignment compare with target-policy fine-tuning?
 \end{enumerate}
 
-To answer these questions, we keep PenSpin's privileged oracle and reproduce its original proprio-only student, then distill a separate student that observes binary link-level contact. Our key idea is to use a small number of paired replay attempts to make source contact observations resemble target contact, freeze that mapping during source-simulator training, and evaluate the re-distilled student in the target simulator. This is plausible because the student can learn from target-like touch cues without changing the source physics; any remaining transfer error can still come from contact dynamics and state drift.
+Our plan retains PenSpin's oracle and proprio-only student, adds a student with binary link contact, and learns a contact mapping from paired replays. We then freeze the mapper, re-distill in the source simulator, and test in the target. The intuition is that target-like contact cues can improve learning even when the source physics cannot be corrected by observation alignment.
 
 % ===========================================================================
 \section{Plan}
