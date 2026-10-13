@@ -1,0 +1,37 @@
+% Pipeline figure (TikZ). Included from main.tex via \input{figures/pipeline}.
+\begin{tikzpicture}[
+    font=\small,
+    stage/.style={draw=black!45, rounded corners=3pt, minimum width=3.3cm,
+                  minimum height=1.05cm, align=center, fill=white},
+    ours/.style={stage, draw=blue!70!black, line width=1pt, fill=blue!8},
+    arr/.style={-{Stealth[length=5pt]}, draw=black!55, line width=0.6pt},
+    lbl/.style={font=\scriptsize, text=black!65},
+    lane/.style={fill=black!5, rounded corners=4pt, inner sep=6pt},
+    lanename/.style={align=left, anchor=west},
+  ]
+  % Source row (Isaac Gym)
+  \node[stage] (oracle) at (0,0)     {\textbf{1 Oracle RL}\\{\scriptsize privileged state, PPO}};
+  \node[stage] (student) at (3.8,0)  {\textbf{2 Student}\\{\scriptsize proprio + contact $c_\mathcal{S}$}};
+  \node[stage] (redist) at (7.6,0)   {\textbf{5 Re-distill}\\{\scriptsize student sees $f(c_\mathcal{S})$}};
+  % Target row (SuperDex)
+  \node[stage] (replay) at (0,-2.6)  {\textbf{3 Open-loop replay}\\{\scriptsize record $c_\mathcal{T}$, all rollouts}};
+  \node[ours]  (align) at (3.8,-2.6) {\textbf{4 Contact alignment}\\{\scriptsize $f: (c_\mathcal{S}, q, a) \rightarrow c_\mathcal{T}$}};
+  \node[stage] (deploy) at (7.6,-2.6){\textbf{6 Zero-shot deploy}\\{\scriptsize native SuperDex touch}};
+
+  % Lane labels
+  \node[lanename] (srcname) at (-4.1,0)   {\textbf{Isaac Gym}\\{\scriptsize source $\mathcal{S}$}};
+  \node[lanename] (tgtname) at (-4.1,-2.6){\textbf{SuperDex}\\{\scriptsize proxy real world}};
+
+  % Lane backgrounds
+  \begin{scope}[on background layer]
+    \node[lane, fit=(srcname)(oracle)(redist)] {};
+    \node[lane, fit=(tgtname)(replay)(deploy)] {};
+  \end{scope}
+
+  % Connectors
+  \draw[arr] (oracle) -- (student);
+  \draw[arr] (oracle) -- node[lbl, right] {oracle actions} (replay);
+  \draw[arr] (replay) -- (align);
+  \draw[arr] (align.north) -- ++(0,0.65) -| node[lbl, pos=0.25, above] {frozen $f$} ([xshift=-0.6cm]redist.south);
+  \draw[arr] ([xshift=0.6cm]redist.south) -- node[lbl, right] {deploy} ([xshift=0.6cm]deploy.north);
+\end{tikzpicture}
