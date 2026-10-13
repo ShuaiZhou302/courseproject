@@ -9,12 +9,12 @@
   lane/.style={fill=black!5, rounded corners=3pt, inner sep=5pt},
   label/.style={font=\scriptsize, align=center}
 ]
-\node[box] (oracle) at (0,0) {\textbf{Oracle PPO}\\privileged state};
-\node[box] (student) at (3.7,0) {\textbf{Contact-aware student}\\$q_{\src}$ and $c_{\src}$};
-\node[alignbox] (redist) at (7.4,0) {\textbf{Re-distill in $\src$}\\$q_{\src}$ and $\tilde c_{\src}$};
-\node[box] (replay) at (0,-2.0) {\textbf{Paired replay attempts}\\source and target contact};
-\node[alignbox] (mapper) at (3.7,-2.0) {\textbf{Train $f$}\\$c_{\src},q_{\src},a_{<t}\mapsto c_{\tgt}$};
-\node[box] (deploy) at (7.4,-2.0) {\textbf{Zero-shot target test}\\$q_{\tgt}$ and native $c_{\tgt}$};
+\node[box] (oracle) at (0,0) {\textbf{1 Oracle PPO}\\privileged state};
+\node[box] (student) at (3.7,0) {\textbf{2 Contact-aware student}\\$q_{\src}$ and $c_{\src}$};
+\node[alignbox] (redist) at (7.4,0) {\textbf{5 Re-distill in $\src$}\\$q_{\src}$ and $\tilde c_{\src}$};
+\node[box] (replay) at (0,-2.0) {\textbf{3 Paired replay attempts}\\source and target contact};
+\node[alignbox] (mapper) at (3.7,-2.0) {\textbf{4 Train $f$}\\$c_{\src},q_{\src},a_{<t}\mapsto c_{\tgt}$};
+\node[box] (deploy) at (7.4,-2.0) {\textbf{6 Zero-shot target test}\\$q_{\tgt}$ and native $c_{\tgt}$};
 \node[anchor=east, font=\scriptsize\bfseries] (srcname) at (-1.8,0) {Isaac Gym $\src$};
 \node[anchor=east, font=\scriptsize\bfseries] (tgtname) at (-1.8,-2.0) {SuperDex $\tgt$};
 \begin{scope}[on background layer]
