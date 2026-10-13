@@ -1,37 +1,31 @@
-% Pipeline figure (TikZ). Included from main.tex via \input{figures/pipeline}.
+% Proposed alignment path; the target fine-tuning baseline is separate.
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
-    font=\small,
-    stage/.style={draw=black!45, rounded corners=3pt, minimum width=3.3cm,
-                  minimum height=1.05cm, align=center, fill=white},
-    ours/.style={stage, draw=blue!70!black, line width=1pt, fill=blue!8},
-    arr/.style={-{Stealth[length=5pt]}, draw=black!55, line width=0.6pt},
-    lbl/.style={font=\scriptsize, text=black!65},
-    lane/.style={fill=black!5, rounded corners=4pt, inner sep=6pt},
-    lanename/.style={align=left, anchor=west},
-  ]
-  % Source row (Isaac Gym)
-  \node[stage] (oracle) at (0,0)     {\textbf{1 Oracle RL}\\{\scriptsize privileged state, PPO}};
-  \node[stage] (student) at (3.8,0)  {\textbf{2 Student}\\{\scriptsize proprio + contact $c_\mathcal{S}$}};
-  \node[stage] (redist) at (7.6,0)   {\textbf{5 Re-distill}\\{\scriptsize student sees $f(c_\mathcal{S})$}};
-  % Target row (SuperDex)
-  \node[stage] (replay) at (0,-2.6)  {\textbf{3 Open-loop replay}\\{\scriptsize record $c_\mathcal{T}$, all rollouts}};
-  \node[ours]  (align) at (3.8,-2.6) {\textbf{4 Contact alignment}\\{\scriptsize $f: (c_\mathcal{S}, q, a) \rightarrow c_\mathcal{T}$}};
-  \node[stage] (deploy) at (7.6,-2.6){\textbf{6 Zero-shot deploy}\\{\scriptsize native SuperDex touch}};
+  font=\small,
+  box/.style={draw=black!55, rounded corners=2pt, minimum width=3.0cm,
+              minimum height=0.9cm, align=center, fill=white},
+  alignbox/.style={box, draw=blue!65!black, fill=blue!8},
+  arrow/.style={-{Stealth[length=5pt]}, line width=0.65pt, draw=black!70},
+  lane/.style={fill=black!5, rounded corners=3pt, inner sep=5pt},
+  label/.style={font=\scriptsize, align=center}
+]
+\node[box] (oracle) at (0,0) {\textbf{Oracle PPO}\\privileged state};
+\node[box] (student) at (3.7,0) {\textbf{Contact-aware student}\\$q_{\src}$ and $c_{\src}$};
+\node[alignbox] (redist) at (7.4,0) {\textbf{Re-distill in $\src$}\\$q_{\src}$ and $\tilde c_{\src}$};
+\node[box] (replay) at (0,-2.0) {\textbf{Paired replay attempts}\\source and target contact};
+\node[alignbox] (mapper) at (3.7,-2.0) {\textbf{Train $f$}\\$c_{\src},q_{\src},a_{<t}\mapsto c_{\tgt}$};
+\node[box] (deploy) at (7.4,-2.0) {\textbf{Zero-shot target test}\\$q_{\tgt}$ and native $c_{\tgt}$};
+\node[anchor=east, font=\scriptsize\bfseries] (srcname) at (-1.8,0) {Isaac Gym $\src$};
+\node[anchor=east, font=\scriptsize\bfseries] (tgtname) at (-1.8,-2.0) {SuperDex $\tgt$};
+\begin{scope}[on background layer]
+  \node[lane,fit=(srcname)(oracle)(student)(redist)] {};
+  \node[lane,fit=(tgtname)(replay)(mapper)(deploy)] {};
+\end{scope}
+\draw[arrow] (oracle) -- (student);
+\draw[arrow] (oracle) -- node[label,right] {actions} (replay);
+\draw[arrow] (replay) -- (mapper);
+\draw[arrow] (mapper.north) -- ++(0,0.55) -| node[label,pos=0.3,above] {freeze $f$} (redist.south);
+\draw[arrow] (redist) -- (deploy);
+\end{tikzpicture}%
+}
 
-  % Lane labels
-  \node[lanename] (srcname) at (-4.1,0)   {\textbf{Isaac Gym}\\{\scriptsize source $\mathcal{S}$}};
-  \node[lanename] (tgtname) at (-4.1,-2.6){\textbf{SuperDex}\\{\scriptsize proxy real world}};
-
-  % Lane backgrounds
-  \begin{scope}[on background layer]
-    \node[lane, fit=(srcname)(oracle)(redist)] {};
-    \node[lane, fit=(tgtname)(replay)(deploy)] {};
-  \end{scope}
-
-  % Connectors
-  \draw[arr] (oracle) -- (student);
-  \draw[arr] (oracle) -- node[lbl, right] {oracle actions} (replay);
-  \draw[arr] (replay) -- (align);
-  \draw[arr] (align.north) -- ++(0,0.65) -| node[lbl, pos=0.25, above] {frozen $f$} ([xshift=-0.6cm]redist.south);
-  \draw[arr] ([xshift=0.6cm]redist.south) -- node[lbl, right] {deploy} ([xshift=0.6cm]deploy.north);
-\end{tikzpicture}

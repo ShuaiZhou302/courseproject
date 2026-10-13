@@ -1,0 +1,34 @@
+name: Build proposal PDF
+on:
+  push:
+    branches: [main]
+    paths:
+      - main.tex
+      - refs.bib
+      - figures/**
+      - corl_2023.sty
+      - corlabbrvnat.bst
+      - .github/workflows/build-pdf.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile LaTeX
+        uses: xu-cheng/latex-action@v4
+        with:
+          root_file: main.tex
+          texlive_version: 2026
+      - name: Save PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: course-project-proposal
+          path: main.pdf
+          if-no-files-found: error
+
+

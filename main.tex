@@ -1,246 +1,108 @@
-% \documentclass[11pt]{article}
-
-% ---------------------------------------------------------------------------
-% Layout close to the CoRL style used by the 16-831 example proposal.
-% To use the official template instead, replace the block below with
-%   \usepackage{corl_2024}   (or the current year's .sty)
-% and keep the rest of the file unchanged.
-% ---------------------------------------------------------------------------
-\documentclass[10pt]{article}
-\usepackage[
-    letterpaper,
-    left=1.5in,
-    right=1.5in,
-    top=1.0in,
-    bottom=0.62in
-]{geometry}
-\usepackage{times}
+\documentclass{article}
+% Fall 2026 course template; preprint mode displays authors without a CoRL 2023 footer.
+\usepackage[preprint]{corl_2023}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
-\usepackage{booktabs}
-\usepackage{array}
-\usepackage{enumitem}
-\usepackage{graphicx}
-\usepackage{xcolor}
+\usepackage{booktabs,array,enumitem,graphicx}
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
-\usepackage[numbers,sort&compress]{natbib}
-\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
-
-\setlist{itemsep=2pt,topsep=4pt}
+\setlist{itemsep=2pt,topsep=3pt}
 
 \newcommand{\src}{\mathcal{S}}
 \newcommand{\tgt}{\mathcal{T}}
 
-\title{\bf 16831 Course Project Proposal: \\ Mind the Touch Gap: Real-to-Sim Contact Alignment\\for Dexterous Pen Spinning}
-
+\title{Mind the Touch Gap: Real-to-Sim Contact Alignment for Dexterous Pen Spinning}
 \author{
-  Xinyao [Last name] \\ {\small [andrewID]} \\ {\small [andrewID]@andrew.cmu.edu}
-  \and
-  [Teammate 2] \\ {\small [andrewID]} \\ {\small [andrewID]@andrew.cmu.edu}
-  \and
-  Seungjae Baek \\ {\small seungjab} \\ {\small seungjab@andrew.cmu.edu}
-  \and
-  Shuai Zhou \\ {\small shuaizho} \\ {\small shuaizho@andrew.cmu.edu}
-  \and
-  Yuan Li \\ {\small yuanli5} \\ {\small yuanli5@andrew.cmu.edu}
-  \and
-  [Teammate 6] \\ {\small [andrewID]} \\ {\small [andrewID]@andrew.cmu.edu}
+  Xinyao [Last name]\\
+  Carnegie Mellon University\\
+  \texttt{[andrewID]@andrew.cmu.edu}
+  \And
+  [Teammate 2]\\
+  Carnegie Mellon University\\
+  \texttt{[andrewID]@andrew.cmu.edu}
+  \And
+  Seungjae Baek\\
+  Carnegie Mellon University\\
+  \texttt{seungjab@andrew.cmu.edu}
+  \AND
+  Shuai Zhou\\
+  Carnegie Mellon University\\
+  \texttt{shuaizho@andrew.cmu.edu}
+  \And
+  Yuan Li\\
+  Carnegie Mellon University\\
+  \texttt{yuanli5@andrew.cmu.edu}
+  \And
+  [Teammate 6]\\
+  Carnegie Mellon University\\
+  \texttt{[andrewID]@andrew.cmu.edu}
 }
-\date{}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Contact-rich, highly dynamic in-hand skills such as pen spinning remain hard to
-transfer from simulation to reality. PenSpin~\cite{wang2024penspin} found that
-policies trained purely in simulation fail on hardware, and instead fine-tuned
-the policy on fewer than 50 successful real-world trajectories collected by
-open-loop replay. That data fixes the policy, not the simulator, so any later
-training in simulation cannot benefit from it. We propose to spend the same
-small replay dataset on correcting the simulator's contact signals instead. We
-learn a contact alignment network that maps the training simulator's contact
-observations to those measured in the target domain, freeze it inside the
-training simulator, re-train the sensorimotor student policy on the aligned
-touch signal, and deploy it zero-shot. Because tactile ground truth on real
-hardware is expensive and unobservable, we study this in a sim-to-sim setting:
-Isaac Gym~\cite{makoviychuk2021isaac} as the training simulator and
-SuperDex~\cite{superdex2026}, a contact-focused simulator with native tactile
-sensing, as a proxy real world. This setting lets us control the size of the
-gap and measure how much of the transfer gap comes from tactile observations
-versus contact dynamics.
+Dynamic in-hand pen spinning is difficult to transfer across simulators and to hardware because small contact errors can change the trajectory. PenSpin~\citep{wang2024penspin} addressed its hardware gap by fine-tuning a proprioceptive student on a small set of successful open-loop replays. We instead test whether the same replay attempts can align a source simulator's contact observations with a target simulator's tactile readings, then re-distill a contact-aware student in the source simulator for zero-shot deployment. Isaac Gym~\citep{makoviychuk2021isaac} supplies training and Project SuperDex~\citep{superdex2026} serves as a target simulator with observable contact, allowing direct sensor-level evaluation. This controlled sim-to-sim study measures whether observation alignment improves transfer while separately diagnosing the effects of state drift and contact dynamics; it does not claim to correct the physics or establish real-world transfer.
 \end{abstract}
+\keywords{Dexterous manipulation, tactile alignment, sim-to-sim transfer}
 
-\noindent\textbf{Keywords:} Dexterous Manipulation, Sim-to-Real Transfer,
-Tactile Sensing, System Identification
+\noindent{\small 16-831 Introduction to Robot Learning, Fall 2026 course project proposal.}
 
-% \vspace{4pt}
-% \noindent{\small Course Project, 16-831 Introduction to Robot Learning, Fall 2026, CMU}
-
-% ===========================================================================
 \section{Introduction}
+Pen spinning is a fast, contact-rich manipulation task in which small changes in timing can cause a drop. PenSpin~\citep{wang2024penspin} trained an oracle with privileged state in Isaac Gym and distilled a student that used \emph{proprioception only}. Its sim-trained policy did not transfer reliably to hardware; fine-tuning on fewer than 50 successful hardware replays improved performance. That target data adapted the policy, leaving open whether a small dataset could instead improve the contact observations available during source-domain training.
 
-Reinforcement learning in simulation is the main way robots acquire dexterous
-in-hand skills that humans cannot easily
-teleoperate~\cite{qi2022hora,openai2020dexterous,qi2023general}. Pen spinning is
-an extreme case: it is fast, contact-rich and unforgiving of small errors.
-PenSpin~\cite{wang2024penspin} reports that extensive domain randomization,
-hardware iteration and different input modalities all failed to transfer, and
-that the pure physics gap remained large even after isolating touch and vision.
+We study that question in a controlled sim-to-sim proxy: Isaac Gym is the source domain $\src$ and SuperDex~\citep{superdex2026} is the target domain $\tgt$. Related work adapts simulation from target experience~\citep{chebotar2019closing,he2025asap,ramos2019bayessim}, including tactile event calibration~\citep{real2sim2real2026}. Our intervention changes the student's \emph{contact input}, not the source collision solver, friction, or object motion. The target simulator permits contact labels and controlled state resets that would be difficult to obtain on hardware.
 
-PenSpin's fix was to replay the simulated oracle open-loop on hardware, keep the
-successful trajectories, and fine-tune the student policy on them. This works
-with very little data, but it treats real data as demonstrations for one policy.
-The simulator stays wrong, so the policy cannot keep improving in simulation,
-and a new task or policy needs new real data.
+We ask: (RQ1) Under controlled changes in friction and compliance, when does contact input help or hurt transfer? (RQ2) Does a learned contact observation mapping improve zero-shot target performance with few replay attempts? (RQ3) How does it compare with target-policy fine-tuning at the same number of replay attempts?
 
-We take the opposite view: use the small target-domain dataset to correct the
-simulator, then keep training in simulation. This follows a line of work that
-adapts simulation from real
-experience~\cite{chebotar2019closing,he2025asap,ramos2019bayessim}, including
-recent tactile calibration by replaying joint trajectories~\cite{real2sim2real2026}.
-We focus on the contact signal, because it is both a policy input and the place
-where simulators disagree most for this task.
-
-We evaluate in a sim-to-sim setting, with SuperDex~\cite{superdex2026} standing
-in for the real world. SuperDex models non-convex collisions, distributed
-contact forces, soft contact and tactile sensors natively, so its contact
-behavior differs from Isaac Gym's in the way we care about. The setting gives us
-unlimited evaluation, ground-truth contact, and a gap whose size we can tune. We
-treat it as a controlled proxy study and do not claim real-world results.
-
-We ask three questions:
-\begin{enumerate}[label=\textbf{RQ\arabic*:},leftmargin=*]
-  \item How much of the transfer gap comes from tactile observations, and how
-        much from contact dynamics?
-  \item How much zero-shot performance does a contact alignment network,
-        trained on a few replayed trajectories, recover?
-  \item How does correcting the simulator compare with PenSpin-style policy
-        fine-tuning at the same data budget?
-\end{enumerate}
-
-% ===========================================================================
 \section{Method}
+We retain PenSpin's privileged oracle but explicitly change its second stage: alongside a reproduced proprio-only student, we distill a student with binary link-level contact. The proposed third stage learns a contact mapping from replay data and re-distills that contact-aware student in $\src$ (Figure~\ref{fig:pipeline}).
 
-We keep PenSpin's first two stages unchanged and replace its real-world
-fine-tuning with a learned correction of the simulator's contact signal. We call
-Isaac Gym the source domain $\src$ and SuperDex the target domain $\tgt$
-(Figure~\ref{fig:pipeline}).
+\paragraph{Environment and reward.}
+An Allegro hand spins pen-like objects using PenSpin's released task, action space, and PD control. We retain its oracle reward: clipped angular velocity about the commanded axis, with penalties for excess velocity, object translation/position error, hand-pose deviation, torque, and mechanical work. Source and target evaluations use the same object geometry, action timing, initial-state distribution, and rotation/drop criteria. Before scaling data collection, a small port smoke test checks hand kinematics, actuator commands, one-step contact readings, and a short replay in SuperDex.
 
-\paragraph{Setup.} An Allegro hand rotates pen-like objects, built on PenSpin's
-released code. The contact observation $c \in \{0,1\}^K$ is a binary vector over
-the $K$ hand links that touch the object. In $\src$ it comes from thresholded
-contact forces; in $\tgt$ we pool SuperDex's native tactile readings onto the
-same $K$ links.
-
-\begin{figure}[t]
+\begin{figure}[htbp]
 \centering
 \input{figures/pipeline}
-\caption{Pipeline. All policy training stays in Isaac Gym; SuperDex only
-supplies replay data for the contact alignment network $f$ and hosts the final
-zero-shot test.}
+\caption{Proposed method. Paired source/target open-loop replay attempts train the observation mapper $f$; only source-domain rollouts train the contact-aware student. The PenSpin-style target fine-tuning baseline is evaluated separately.}
 \label{fig:pipeline}
 \end{figure}
 
-\begin{enumerate}[leftmargin=*]
-  \item \textbf{Oracle.} Train an oracle policy with PPO in $\src$ using
-        privileged object state and physical parameters, as in PenSpin.
-  \item \textbf{Student.} Distill a sensorimotor student whose input is a
-        history of proprioception $q$ and contacts $c_\src$.
-  \item \textbf{Replay and collect.} Replay oracle action sequences open-loop in
-        $\tgt$ from matched initial states. Record target contacts $c_\tgt$
-        alongside $c_\src$, $q$ and actions $a$. We keep all rollouts: the
-        success label filters data for the PenSpin baseline, not for the sensor
-        model, since failed rollouts still carry valid contact readings.
-  \item \textbf{Contact alignment.} Train a small temporal network $f$ that
-        predicts $c_\tgt$ at time $t$ from a window of $(c_\src, q, a)$:
-        \begin{equation}
-          \hat{c}_{\tgt,t} = f_\phi\big(c_{\src,t-H:t},\, q_{t-H:t},\, a_{t-H:t}\big),
-          \qquad
-          \mathcal{L}(\phi) = \mathrm{BCE}\big(\hat{c}_{\tgt,t},\, c_{\tgt,t}\big).
-        \end{equation}
-        Conditioning on $q$ and $a$ matters because replayed trajectories drift
-        apart in $\src$ and $\tgt$, so contacts at the same step are not from
-        identical states.
-  \item \textbf{Re-distill.} Freeze $f$ inside $\src$, feed the student
-        $f(c_\src)$ instead of $c_\src$, and distill again from the fixed oracle.
-  \item \textbf{Deploy.} Run the re-distilled student zero-shot in $\tgt$ on
-        SuperDex's native contacts.
-\end{enumerate}
+\paragraph{Shared contact representation.}
+Let $c_{\src,t},c_{\tgt,t}\in\{0,1\}^{K}$ indicate which of the same $K$ hand links touch the pen. Source contact forces and pooled target tactile readings are thresholded at the corresponding observation time. We fix link mapping and sampling convention before training and select thresholds using training/validation replays, never target test episodes.
 
-$\tgt$ also allows a pairing that hardware does not: reset $\tgt$ to the exact
-state of $\src$ at each step and take one step. This yields state-matched
-contact pairs, which we use only as an upper bound for $f$.
+\paragraph{Replay and supervision.}
+From matched initial states, replay the oracle's action sequence open-loop in both simulators and record $(q_{\src,t},c_{\src,t})$, $(q_{\tgt,t},c_{\tgt,t})$, object state for offline diagnostics, and the preceding actions. All attempted rollouts supply contact labels, including failures. Time-indexed contacts need not describe the same physical state after the trajectories drift; we measure joint/object-state divergence and report mapping accuracy by divergence bin. In a separate diagnostic, we reset $\tgt$ to source states before a matched step to construct state-matched contact pairs. This control uses stronger simulator access and is not an attainable hardware-data baseline or a mathematical upper bound.
 
-% ===========================================================================
+\paragraph{Alignment and re-distillation.}
+A small temporal model outputs target-contact probabilities from source observations available before choosing action $a_t$:
+\begin{equation}
+p_{\tgt,t}=f_{\phi}\!\left(c_{\src,t-H:t},q_{\src,t-H:t},
+a_{t-H:t-1}\right),\quad
+\mathcal{L}=\operatorname{BCE}(p_{\tgt,t},c_{\tgt,t}).
+\end{equation}
+We select a per-link threshold on held-out replay data and feed $\tilde c_{\src,t}=\mathbf{1}[p_{\tgt,t}>\tau]$ to the student during source-domain re-distillation from the fixed oracle. At deployment, the same student receives binary native target contact $c_{\tgt,t}$; $f$ is not run in $\tgt$. We also compare probability input and hard thresholding as an ablation so that a gain cannot be attributed to an unnoticed train/test input mismatch.
+
 \section{Experiments}
+All methods use the same target test objects, initial states, and evaluation episodes. We compare proprio-only and raw-contact students, source contact randomization (noise, dropout, delay), parametric contact calibration~\citep{real2sim2real2026}, our learned alignment, and PenSpin-style target fine-tuning~\citep{wang2024penspin}. The state-matched variant is reported as a diagnostic with its extra state access clearly marked.
 
-All policies are evaluated zero-shot in $\tgt$ on the same objects and initial
-states. Every method that uses target data gets the same replay budget
-(Table~\ref{tab:methods}).
+\paragraph{Data budget and metrics.}
+For 10, 25, 50, and 100 \emph{attempted} target replays, calibration and fine-tuning receive the same attempts. Fine-tuning follows PenSpin by filtering for successes; we report how many successful demonstrations each budget yielded. Policy metrics are full rotations, time to drop, and success rate at a fixed rotation criterion. Sensor metrics on held-out replay attempts are per-link precision, recall, F1, and contact-onset timing error. We report mean and variability across evaluation seeds, plus replay-state divergence.
 
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.38\linewidth}>{\raggedright\arraybackslash}p{0.30\linewidth}>{\raggedright\arraybackslash}p{0.26\linewidth}@{}}
-\toprule
-Method & Target data used for & Role \\
-\midrule
-Student, no alignment & --- & Lower bound \\
-Proprio-only student & --- & Does touch help at all? \\
-Contact domain randomization (noise, dropout, delay) & --- & Standard robustness baseline \\
-Parametric tactile calibration~\cite{real2sim2real2026} & fitting threshold, delay, dropout & Non-learned simulator correction \\
-PenSpin fine-tuning~\cite{wang2024penspin} & behavior cloning on successful replays & Policy-side adaptation \\
-\textbf{Ours: learned contact alignment} & training $f$ & Proposed method \\
-Ours, state-matched pairs & training $f$ & Upper bound for $f$ \\
-\bottomrule
-\end{tabular}
-\caption{Methods compared. All are deployed zero-shot in SuperDex.}
-\label{tab:methods}
-\end{table}
+\paragraph{Diagnostic comparisons (RQ1).}
+Compare each student's source and target performance, then vary target friction and contact compliance. Proprio-only transfer and aligned-versus-raw-contact transfer reveal which interventions are useful, but observation and dynamics interact; their performance differences are not additive estimates of separate gap components. The state-matched control tests whether time-indexed pairing errors account for poor alignment.
 
-\paragraph{Metrics.} Full rotations per episode and time before the pen drops,
-following PenSpin; contact prediction F1 of $f$ on held-out target rollouts.
-
-\paragraph{Data efficiency (RQ2, RQ3).} Repeat the comparison with 10, 25, 50
-and 100 replayed trajectories.
-
-\paragraph{Gap decomposition (RQ1).} The proprio-only student's drop from
-$\src$ to $\tgt$ estimates the dynamics gap alone. The tactile student's drop
-inside $\src$ when its contacts pass through the frozen $f$ estimates the
-observation gap alone. We also vary SuperDex friction and contact compliance to
-see how both terms grow with the size of the gap.
-
-% ===========================================================================
-\section{Plan}
-
-The largest risk is porting the environment to SuperDex, so it comes first after
-the baseline reproduction.
-
+\section{Plan and limitations}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{10/09/2026 -- 10/23/2026:} Reproduce PenSpin's oracle and
-        student in Isaac Gym from the released code; fix the shared $K$-link
-        contact representation.
-  \item \textbf{10/24/2026 -- 11/06/2026:} Port the Allegro hand, pen objects and
-        PD controller to SuperDex and check that controls match; run open-loop
-        replay and collect paired contact data.
-  \item \textbf{11/07/2026 -- 11/20/2026:} Train the contact alignment network,
-        re-distill the student, and get first zero-shot results.
-  \item \textbf{11/21/2026 -- 12/04/2026:} Run baselines, data-efficiency and
-        gap-decomposition experiments.
-  \item \textbf{12/05/2026 -- 12/11/2026:} Summarize results in the final report
-        and presentation.
+  \item \textbf{By 10/23/2026:} Reproduce oracle/proprio-only baseline, implement the shared contact representation, and pass the SuperDex hand/control/contact smoke test.
+  \item \textbf{By 11/06/2026:} Complete the target port, synchronized replay logging, divergence checks, and a small paired dataset.
+  \item \textbf{By 11/20/2026:} Train $f$, re-distill the contact-aware student, and obtain first target evaluation results.
+  \item \textbf{By 12/04/2026:} Run equal-attempt baselines, data-budget sweeps, and state-matched diagnostics; prepare the final report and presentation.
 \end{itemize}
+The SuperDex port is the main engineering risk. If full pen spinning is unstable, begin with a simpler in-hand rotation task~\citep{qi2022hora}; if the port stalls, use a target simulator with explicit link-level contact labels and state the change. A gain in this proxy setting would support contact-observation alignment, not real-hardware transfer or a correction to contact dynamics.
 
-\paragraph{Fallbacks.} If replay in SuperDex almost never succeeds, we start from
-an easier in-hand rotation task~\cite{qi2022hora} before pens. If porting stalls,
-we use MuJoCo with soft-contact settings as the target domain. If the gap turns
-out too small, we widen it through SuperDex's friction and compliance
-parameters.
-
-\bibliographystyle{unsrtnat}
+\acknowledgments{ChatGPT assisted with editorial revision and LaTeX formatting. The student authors reviewed the proposal and remain responsible for its content.}
 \bibliography{refs}
-
 \end{document}
+
