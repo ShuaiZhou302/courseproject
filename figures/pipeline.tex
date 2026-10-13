@@ -22,6 +22,7 @@
   \node[lane,fit=(tgtname)(replay)(mapper)(deploy)] {};
 \end{scope}
 \draw[arrow] (oracle) -- (student);
+\draw[arrow,dashed] (student) -- node[label,above] {same teacher} (redist);
 \draw[arrow] (oracle) -- node[label,right] {actions} (replay);
 \draw[arrow] (replay) -- (mapper);
 \draw[arrow] (mapper.north) -- ++(0,0.55) -| node[label,pos=0.3,above] {freeze $f$} (redist.south);
