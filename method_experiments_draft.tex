@@ -1,0 +1,70 @@
+% Archived Method and Experiments draft from the four-page version.
+% Intentionally not included by main.tex; retain for future expansion.
+% ===========================================================================
+\section{Method}
+
+We retain PenSpin's privileged oracle, reproduce its proprio-only student, and add a student with binary link-level contact. The proposed third stage aligns that contact input and re-distills the contact-aware student (Figure~\ref{fig:pipeline}). We call Isaac Gym the source domain $\src$ and SuperDex the target domain $\tgt$.
+
+\paragraph{Setup.}
+An Allegro hand spins pen-like objects using PenSpin's released task, action space, and PD control. The common observation $c_t\in\{0,1\}^{K}$ indicates which of $K$ corresponding hand links touch the pen. Source contact forces and pooled target readings are thresholded at the same policy observation rate. Link mapping and thresholds are fixed using training and validation replays, never target test episodes. We aim to match object geometry, action timing, initial-state distribution, and rotation/drop criteria across simulators.
+
+\begin{figure}[htbp]
+\centering
+\input{figures/pipeline}
+\caption{Six-stage pipeline. Paired replay attempts train the contact observation mapper $f$; source-domain rollouts train the student. The target simulator supplies native contact for evaluation, while target-policy fine-tuning is a separate baseline.}
+\label{fig:pipeline}
+\end{figure}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Oracle.} Train a privileged PPO oracle in $\src$ with object state and physical parameters, following PenSpin's reward and control setup.
+  \item \textbf{Student.} Reproduce the proprio-only student and distill a separate contact-aware student from the same oracle. The latter observes a history of proprioception $q$ and binary contact $c_{\src}$.
+  \item \textbf{Replay and collect.} From matched initial states, replay the same oracle actions open-loop in $\src$ and $\tgt$. Log contact, joint and object state, and preceding actions in both domains. All attempted replays supply contact labels, including failures; the fine-tuning baseline may filter successes.
+  \item \textbf{Contact alignment.} Train a small temporal mapper to predict target binary contacts from source observations available before action $a_t$:
+  \begin{equation}
+    p_{\tgt,t}=f_{\phi}(c_{\src,t-H:t},q_{\src,t-H:t},a_{t-H:t-1}),
+    \quad \mathcal{L}=\operatorname{BCE}(p_{\tgt,t},c_{\tgt,t}).
+  \end{equation}
+  Choose a per-link threshold $\tau$ on validation replays and form $\tilde c_{\src,t}=\mathbf{1}[p_{\tgt,t}>\tau]$.
+  \item \textbf{Re-distill.} Freeze $f$ and distill the contact-aware student again from the fixed oracle in $\src$, supplying $\tilde c_{\src}$ in the same binary format as target contact.
+  \item \textbf{Deploy.} Evaluate the re-distilled student in $\tgt$ with native binary target contact. The mapper is not run in $\tgt$.
+\end{enumerate}
+
+Time-indexed open-loop replays can drift into different physical states. We will measure joint- and object-state divergence and report contact prediction accuracy by divergence bin. In a separate diagnostic, we reset $\tgt$ to source states before matched steps to create state-matched contact pairs. This requires privileged simulator access and is neither a deployable hardware-data baseline nor a mathematical upper bound.
+
+\FloatBarrier
+% ===========================================================================
+\section{Experiments}
+
+All policies use the same target test objects, initial states, and evaluation episodes. Table~\ref{tab:methods} retains the baseline comparison from our original proposal. Methods using target data receive the same number of \emph{attempted} replay episodes; for PenSpin-style behavior cloning, we additionally report how many were successful.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.35\linewidth}>{\raggedright\arraybackslash}p{0.29\linewidth}>{\raggedright\arraybackslash}p{0.26\linewidth}@{}}
+\toprule
+Method & Target data used for & Role \\
+\midrule
+Proprio-only student & --- & Original PenSpin input baseline \\
+Raw-contact student & --- & Contact without alignment \\
+Contact randomization (noise, dropout, delay) & --- & Robustness baseline \\
+Parametric contact calibration~\citep{real2sim2real2026} & Threshold and delay fitting & Simple sensor correction \\
+PenSpin-style target fine-tuning~\citep{wang2024penspin} & BC on successful replays & Policy adaptation \\
+\textbf{Learned contact alignment} & Training $f$ & Proposed method \\
+State-matched contact pairs & Training $f$ with resets & Diagnostic with extra access \\
+\bottomrule
+\end{tabular}
+\caption{Methods compared under matched target test conditions. Target-policy fine-tuning uses target training data and is evaluated on held-out target episodes; it is not zero-shot.}
+\label{tab:methods}
+\end{table}
+
+\paragraph{Metrics.}
+Policy metrics are full rotations, time until drop, and success rate at a fixed rotation criterion. Sensor metrics on held-out replay attempts are per-link contact precision, recall, F1, and onset timing error. We will report mean and variability across evaluation seeds together with replay-state divergence.
+
+\paragraph{Data efficiency (RQ2, RQ3).}
+We compare 10, 25, 50, and 100 attempted target replays. Calibration and alignment can use labels from all attempts. PenSpin-style fine-tuning filters successful trajectories as in the original method, so we will report its successful demonstration count at each equal-attempt budget. Training, validation, and contact test sets are split by entire replay, not by time step.
+
+\paragraph{Diagnostic comparisons (RQ1).}
+We compare each student's source and target performance, then vary target friction and compliance. Proprio-only transfer, raw-contact transfer, and aligned-contact transfer show which interventions help. Observation errors and contact dynamics interact, so their performance differences are not additive estimates of separate gap components. The state-matched control tests whether time-indexed pairing error limits the mapper.
+
+\FloatBarrier
+

@@ -4,7 +4,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
-\usepackage{booktabs,array,enumitem,graphicx}
+\usepackage{enumitem,graphicx}
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 \usepackage{placeins}
@@ -13,8 +13,8 @@
 \newcommand{\src}{\mathcal{S}}
 \newcommand{\tgt}{\mathcal{T}}
 
-\title{16831 Course Project Proposal\\[4pt]{\large Mind the Touch Gap: Real-to-Sim Contact\\Alignment for Dexterous Pen Spinning}}
-\hypersetup{pdftitle={16831 Course Project Proposal: Mind the Touch Gap: Real-to-Sim Contact Alignment for Dexterous Pen Spinning},pdfauthor={Xinyao Li, Wen-Han Hsieh, Seungjae Baek, Shuai Zhou, Yuan Li, Yusu Fang},pdfsubject={16-831 Fall 2026 Course Project Proposal}}
+\title{Mind the Touch Gap:\\Real-to-Sim Contact Alignment\\for Dexterous Pen Spinning}
+\hypersetup{pdftitle={Mind the Touch Gap: Real-to-Sim Contact Alignment for Dexterous Pen Spinning},pdfauthor={Xinyao Li, Wen-Han Hsieh, Seungjae Baek, Shuai Zhou, Yuan Li, Yusu Fang},pdfsubject={16-831 Fall 2026 Course Project Proposal}}
 \author{
   Xinyao Li\\{\normalfont\small xinyaol2}\\{\normalfont\small\texttt{xinyaol2@andrew.cmu.edu}}
   \And
@@ -36,7 +36,6 @@
 Contact-rich, dynamic in-hand skills such as pen spinning remain difficult to transfer from simulation. PenSpin~\citep{wang2024penspin} improved its hardware performance by fine-tuning a proprioceptive student on a small set of successful open-loop replays. We ask whether the same limited target experience can instead improve the contact observations used during simulator training. We propose to replay source actions in a target simulator, learn a mapping from source link-level contact to target contact, freeze that mapping in the source simulator, and re-distill a contact-aware student. Isaac Gym~\citep{makoviychuk2021isaac} supplies source training; Project SuperDex~\citep{superdex2026} supplies a controlled target with observable contacts. We compare against the original proprio-only student, raw-contact training, randomized contact, simple calibration, and PenSpin-style target fine-tuning. This sim-to-sim proxy tests the value of contact-observation alignment; it does not claim to correct contact dynamics or establish hardware transfer.
 \end{abstract}
 \keywords{Dexterous manipulation, contact alignment, sim-to-sim transfer}
-\noindent\textbf{Team size:} 6.
 
 % ===========================================================================
 \section{Introduction}
@@ -56,76 +55,32 @@ We ask three questions:
   \item How does observation alignment compare with target-policy fine-tuning at the same number of replay attempts?
 \end{enumerate}
 
+To answer these questions, we keep PenSpin's privileged oracle and reproduce its original proprio-only student, then distill a separate student that observes binary link-level contact. Our key idea is to use a small number of paired replay attempts to make source contact observations resemble target contact, freeze that mapping during source-simulator training, and evaluate the re-distilled student in the target simulator. This is plausible because the student can learn from target-like touch cues without changing the source physics; any remaining transfer error can still come from contact dynamics and state drift.
+
 % ===========================================================================
-\section{Method}
+\section{Plan}
 
-We retain PenSpin's privileged oracle, reproduce its proprio-only student, and add a student with binary link-level contact. The proposed third stage aligns that contact input and re-distills the contact-aware student (Figure~\ref{fig:pipeline}). We call Isaac Gym the source domain $\src$ and SuperDex the target domain $\tgt$.
-
-\paragraph{Setup.}
-An Allegro hand spins pen-like objects using PenSpin's released task, action space, and PD control. The common observation $c_t\in\{0,1\}^{K}$ indicates which of $K$ corresponding hand links touch the pen. Source contact forces and pooled target readings are thresholded at the same policy observation rate. Link mapping and thresholds are fixed using training and validation replays, never target test episodes. We aim to match object geometry, action timing, initial-state distribution, and rotation/drop criteria across simulators.
+\paragraph{Implementation and data collection.}
+We will use PenSpin's Allegro hand, pen-like objects, action space, and PD control. Corresponding hand links in Isaac Gym ($\src$) and SuperDex ($\tgt$) will share a binary contact representation at the policy observation rate. We will match object geometry, control timing, initial states, and rotation/drop criteria. After training the privileged oracle and the two students, we will replay the same oracle actions in both simulators from matched initial states and record contact, joint and object states, and preceding actions. Every attempted replay supplies mapper labels, including failed attempts.
 
 \begin{figure}[htbp]
 \centering
 \input{figures/pipeline}
-\caption{Six-stage pipeline. Paired replay attempts train the contact observation mapper $f$; source-domain rollouts train the student. The target simulator supplies native contact for evaluation, while target-policy fine-tuning is a separate baseline.}
+\caption{Six-stage proposal plan. Paired replay attempts train the contact mapper; source rollouts re-distill the student. SuperDex supplies native contact for evaluation. Target-policy fine-tuning is a separate baseline.}
 \label{fig:pipeline}
 \end{figure}
-
-\begin{enumerate}[leftmargin=*]
-  \item \textbf{Oracle.} Train a privileged PPO oracle in $\src$ with object state and physical parameters, following PenSpin's reward and control setup.
-  \item \textbf{Student.} Reproduce the proprio-only student and distill a separate contact-aware student from the same oracle. The latter observes a history of proprioception $q$ and binary contact $c_{\src}$.
-  \item \textbf{Replay and collect.} From matched initial states, replay the same oracle actions open-loop in $\src$ and $\tgt$. Log contact, joint and object state, and preceding actions in both domains. All attempted replays supply contact labels, including failures; the fine-tuning baseline may filter successes.
-  \item \textbf{Contact alignment.} Train a small temporal mapper to predict target binary contacts from source observations available before action $a_t$:
-  \begin{equation}
-    p_{\tgt,t}=f_{\phi}(c_{\src,t-H:t},q_{\src,t-H:t},a_{t-H:t-1}),
-    \quad \mathcal{L}=\operatorname{BCE}(p_{\tgt,t},c_{\tgt,t}).
-  \end{equation}
-  Choose a per-link threshold $\tau$ on validation replays and form $\tilde c_{\src,t}=\mathbf{1}[p_{\tgt,t}>\tau]$.
-  \item \textbf{Re-distill.} Freeze $f$ and distill the contact-aware student again from the fixed oracle in $\src$, supplying $\tilde c_{\src}$ in the same binary format as target contact.
-  \item \textbf{Deploy.} Evaluate the re-distilled student in $\tgt$ with native binary target contact. The mapper is not run in $\tgt$.
-\end{enumerate}
-
-Time-indexed open-loop replays can drift into different physical states. We will measure joint- and object-state divergence and report contact prediction accuracy by divergence bin. In a separate diagnostic, we reset $\tgt$ to source states before matched steps to create state-matched contact pairs. This requires privileged simulator access and is neither a deployable hardware-data baseline nor a mathematical upper bound.
-
 \FloatBarrier
-% ===========================================================================
-\section{Experiments}
 
-All policies use the same target test objects, initial states, and evaluation episodes. Table~\ref{tab:methods} retains the baseline comparison from our original proposal. Methods using target data receive the same number of \emph{attempted} replay episodes; for PenSpin-style behavior cloning, we additionally report how many were successful.
+\paragraph{Contact alignment.}
+A small temporal mapper $f_\phi(c_{\src,t-H:t},q_{\src,t-H:t},a_{t-H:t-1})$ predicts target link-contact probabilities from source contact $c$, proprioception $q$, and action history $a$ available before action $a_t$. We train it with binary cross-entropy on paired replay contacts, choose per-link thresholds on validation replays, and supply the resulting binary contacts when re-distilling the student from the fixed oracle in $\src$. The mapper is frozen during re-distillation and is not run in $\tgt$; deployment uses native target contact.
 
-\begin{table}[htbp]
-\centering
-\small
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.35\linewidth}>{\raggedright\arraybackslash}p{0.29\linewidth}>{\raggedright\arraybackslash}p{0.26\linewidth}@{}}
-\toprule
-Method & Target data used for & Role \\
-\midrule
-Proprio-only student & --- & Original PenSpin input baseline \\
-Raw-contact student & --- & Contact without alignment \\
-Contact randomization (noise, dropout, delay) & --- & Robustness baseline \\
-Parametric contact calibration~\citep{real2sim2real2026} & Threshold and delay fitting & Simple sensor correction \\
-PenSpin-style target fine-tuning~\citep{wang2024penspin} & BC on successful replays & Policy adaptation \\
-\textbf{Learned contact alignment} & Training $f$ & Proposed method \\
-State-matched contact pairs & Training $f$ with resets & Diagnostic with extra access \\
-\bottomrule
-\end{tabular}
-\caption{Methods compared under matched target test conditions. Target-policy fine-tuning uses target training data and is evaluated on held-out target episodes; it is not zero-shot.}
-\label{tab:methods}
-\end{table}
+\paragraph{Evaluation and baselines.}
+We will compare our aligned-contact student with the original proprio-only student, a raw-contact student, contact noise/dropout/delay randomization, parametric threshold-and-delay calibration~\citep{real2sim2real2026}, and PenSpin-style student fine-tuning on successful target replays~\citep{wang2024penspin}. All policies will use the same held-out SuperDex test objects, initial states, and episodes. Methods using target data receive equal numbers of \emph{attempted} replay episodes; we will also report how many successful demonstrations the fine-tuning baseline retained. This keeps the data budget comparison interpretable without treating target fine-tuning as zero-shot.
 
-\paragraph{Metrics.}
-Policy metrics are full rotations, time until drop, and success rate at a fixed rotation criterion. Sensor metrics on held-out replay attempts are per-link contact precision, recall, F1, and onset timing error. We will report mean and variability across evaluation seeds together with replay-state divergence.
+\paragraph{Measurements and diagnostics.}
+At budgets of 10, 25, 50, and 100 attempted target replays, we will measure full rotations, time until drop, and success rate, along with held-out per-link contact precision, recall, F1, and onset timing error. We will report variation across evaluation seeds and vary target friction and compliance. Because time-indexed open-loop replays can drift into different physical states, we will measure joint/object-state divergence and group contact errors by divergence. As a separate diagnostic, privileged resets will create state-matched contact pairs; this control requires extra simulator access and is not a deployable baseline or a mathematical upper bound.
 
-\paragraph{Data efficiency (RQ2, RQ3).}
-We compare 10, 25, 50, and 100 attempted target replays. Calibration and alignment can use labels from all attempts. PenSpin-style fine-tuning filters successful trajectories as in the original method, so we will report its successful demonstration count at each equal-attempt budget. Training, validation, and contact test sets are split by entire replay, not by time step.
-
-\paragraph{Diagnostic comparisons (RQ1).}
-We compare each student's source and target performance, then vary target friction and compliance. Proprio-only transfer, raw-contact transfer, and aligned-contact transfer show which interventions help. Observation errors and contact dynamics interact, so their performance differences are not additive estimates of separate gap components. The state-matched control tests whether time-indexed pairing error limits the mapper.
-
-\FloatBarrier
-% ===========================================================================
-\section{Plan}
-
+\paragraph{Schedule and risks.}
 The largest engineering risk is porting the Allegro/pen environment to SuperDex. We begin with a short hand-control/contact replay smoke test before scaling data collection.
 
 \begin{itemize}[leftmargin=*]
