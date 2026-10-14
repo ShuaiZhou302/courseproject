@@ -1,4 +1,4 @@
-% Proposed alignment path; the target fine-tuning baseline is separate.
+% Pipeline figure (TikZ), included from main.tex. Blue stages are the proposed additions.
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
   font=\small,
@@ -10,22 +10,21 @@
   label/.style={font=\scriptsize, align=center}
 ]
 \node[box] (oracle) at (0,0) {\textbf{1 Oracle PPO}\\privileged state};
-\node[box] (student) at (3.7,0) {\textbf{2 Contact-aware student}\\$q_{\src}$ and $c_{\src}$};
-\node[alignbox] (redist) at (7.4,0) {\textbf{5 Re-distill in $\src$}\\$q_{\src}$ and $\tilde c_{\src}$};
-\node[box] (replay) at (0,-2.0) {\textbf{3 Paired replay attempts}\\source and target contact};
-\node[alignbox] (mapper) at (3.7,-2.0) {\textbf{4 Train $f$}\\$c_{\src},q_{\src},a_{<t}\mapsto c_{\tgt}$};
-\node[box] (deploy) at (7.4,-2.0) {\textbf{6 Zero-shot target test}\\$q_{\tgt}$ and native $c_{\tgt}$};
-\node[anchor=east, font=\scriptsize\bfseries] (srcname) at (-1.8,0) {Isaac Gym $\src$};
-\node[anchor=east, font=\scriptsize\bfseries] (tgtname) at (-1.8,-2.0) {SuperDex $\tgt$};
+\node[box] (student) at (3.7,0) {\textbf{2 Student}\\$q_{\src}$ and $c_{\src}$};
+\node[alignbox] (redist) at (7.4,0) {\textbf{5 Re-distill}\\$q_{\src}$ and $\hat c_{\tgt}$};
+\node[box] (replay) at (0,-2.0) {\textbf{3 Paired replay}\\all attempts kept};
+\node[alignbox] (mapper) at (3.7,-2.0) {\textbf{4 Contact alignment}\\$f:(c_{\src},q_{\src},a)\mapsto c_{\tgt}$};
+\node[box] (deploy) at (7.4,-2.0) {\textbf{6 Zero-shot deploy}\\native $c_{\tgt}$};
+\node[anchor=east, font=\scriptsize, align=right] (srcname) at (-1.8,0) {\textbf{Isaac Gym $\src$}\\training sim};
+\node[anchor=east, font=\scriptsize, align=right] (tgtname) at (-1.8,-2.0) {\textbf{SuperDex $\tgt$}\\proxy real world};
 \begin{scope}[on background layer]
   \node[lane,fit=(srcname)(oracle)(student)(redist)] {};
   \node[lane,fit=(tgtname)(replay)(mapper)(deploy)] {};
 \end{scope}
 \draw[arrow] (oracle) -- (student);
-\draw[arrow] (oracle) -- node[label,right] {actions} (replay);
+\draw[arrow] (oracle) -- node[label,right] {oracle actions} (replay);
 \draw[arrow] (replay) -- (mapper);
-\draw[arrow] (mapper.north) -- ++(0,0.55) -| node[label,pos=0.3,above] {freeze $f$} (redist.south);
-\draw[arrow] (redist) -- (deploy);
+\draw[arrow] (mapper.north) -- ++(0,0.55) -| node[label,pos=0.3,above] {frozen $f$} ([xshift=-0.7cm]redist.south);
+\draw[arrow] ([xshift=0.7cm]redist.south) -- node[label,right] {deploy} ([xshift=0.7cm]deploy.north);
 \end{tikzpicture}%
 }
-
