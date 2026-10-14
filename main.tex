@@ -4,8 +4,13 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb}
-\usepackage{enumitem}
+\usepackage{enumitem,graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 \setlist{itemsep=1pt,topsep=3pt}
+
+\newcommand{\src}{\mathcal{S}}
+\newcommand{\tgt}{\mathcal{T}}
 
 \title{{\Large Mind the Touch Gap: Real-to-Sim Contact\\Alignment for Dexterous Pen Spinning}}
 \hypersetup{pdftitle={Mind the Touch Gap: Real-to-Sim Contact Alignment for Dexterous Pen Spinning},pdfauthor={Xinyao Li, Wen-Han Hsieh, Seungjae Baek, Shuai Zhou, Yuan Li, Yusu Fang},pdfsubject={16-831 Fall 2026 Course Project Proposal}}
@@ -38,9 +43,14 @@ Reinforcement learning in simulation has enabled dexterous in-hand skills that w
 
 Prior work has used small amounts of real experience to make the simulator more faithful, by inferring simulation parameters~\citep{chebotar2019closing,ramos2019bayessim}, learning a residual action model for the dynamics~\citep{he2025asap}, or calibrating a parametric tactile model through trajectory replay~\citep{real2sim2real2026}. We apply this real-to-sim idea to touch. Contact is both a policy input and the signal on which simulators disagree most: under the same actions, they report contact on different links, at different times, and with different spurious and missed events, and a student distilled on one simulator's contacts learns to rely on these artifacts. We therefore learn a contact alignment model $f$ that predicts target-domain contact from the source simulator's contact, proprioception and recent actions, trained on paired open-loop replays. Freezing $f$ inside the training simulator lets us re-distill a contact-aware student on target-like touch while all policy learning stays in simulation. Unlike policy fine-tuning, the correction can be reused by any later policy. Unlike parametric calibration, it can capture link- and state-dependent errors. Because every replay yields contact labels, it can also learn from the failed replays that PenSpin discards.
 
-Since contact ground truth is hard to measure on hardware, we study this question in a sim-to-sim setting, with Isaac Gym~\citep{makoviychuk2021isaac} as the training simulator and Project SuperDex~\citep{superdex2026} as a proxy for the real world. SuperDex natively models non-convex collisions, distributed soft contact and tactile sensing, provides ground-truth contact, and exposes friction and compliance parameters that let us vary the size of the gap. Following Track~1, we first reproduce PenSpin's oracle and proprioceptive student, then add contact alignment as our improvement, and finally analyze it through ablations.
+Since contact ground truth is hard to measure on hardware, we study this question in a sim-to-sim setting, with Isaac Gym~\citep{makoviychuk2021isaac} as the training simulator and Project SuperDex~\citep{superdex2026} as a proxy for the real world. SuperDex natively models non-convex collisions, distributed soft contact and tactile sensing, provides ground-truth contact, and exposes friction and compliance parameters that let us vary the size of the gap. Following Track~1, we first reproduce PenSpin's oracle and proprioceptive student, then add contact alignment as our improvement, and finally analyze it through ablations. Figure~\ref{fig:pipeline} summarizes the pipeline.
 
-All policies are evaluated zero-shot in SuperDex on the same objects and initial states, and methods that use target data receive the same budget of 10, 25, 50 or 100 replays. Our baselines are the proprio-only student, a raw-contact student without alignment, contact randomization (noise, dropout and delay), parametric threshold-and-delay calibration~\citep{real2sim2real2026}, and PenSpin-style fine-tuning on the successful replays~\citep{wang2024penspin}. As an upper reference, we also train $f$ on state-matched pairs obtained by resetting SuperDex to Isaac Gym's state at every step, which is possible only between simulators. Following PenSpin, we report full rotations per episode and time until the pen drops, together with the per-link contact F1 of $f$. Comparing the proprio-only and contact-aware students while varying friction and compliance shows how much of the transfer gap comes from contact observations rather than contact dynamics. Ablations cover the inputs and history length of $f$ and the use of failed replays.
+\begin{figure}[t]
+\centering
+\input{figures/pipeline}
+\caption{Overview. All policy learning stays in Isaac Gym. SuperDex supplies paired replay data for the contact alignment model $f$ and hosts the final zero-shot evaluation. Blue stages are our additions to PenSpin.}
+\label{fig:pipeline}
+\end{figure}
 
 % ===========================================================================
 \section{Plan}
@@ -52,6 +62,8 @@ All policies are evaluated zero-shot in SuperDex on the same objects and initial
   \item \textbf{11/11/2026 -- 12/01/2026 (ToDo):} Run baselines across replay budgets, friction and compliance sweeps, and ablations.
   \item \textbf{12/02/2026 -- 12/11/2026 (ToDo):} Summarize results in the final report and presentation.
 \end{itemize}
+
+\paragraph{Evaluation.} All policies are evaluated zero-shot in SuperDex on the same objects and initial states. Following PenSpin, we report full rotations per episode and time until the pen drops, and we report the per-link contact F1 of $f$ on held-out replays. Methods that use target data receive the same budget of 10, 25, 50 or 100 replays. Our baselines are the proprio-only student, a raw-contact student without alignment, contact randomization (noise, dropout and delay), parametric threshold-and-delay calibration~\citep{real2sim2real2026}, and PenSpin-style fine-tuning on the successful replays~\citep{wang2024penspin}. As an upper reference, we also train $f$ on state-matched pairs obtained by resetting SuperDex to Isaac Gym's state at every step, which is possible only between simulators. Comparing the proprio-only and contact-aware students while varying friction and compliance shows how much of the transfer gap comes from contact observations rather than contact dynamics. Ablations cover the inputs and history length of $f$ and the use of failed replays.
 
 \acknowledgments{AI tools assisted with editing and LaTeX formatting.}
 \bibliography{refs}
