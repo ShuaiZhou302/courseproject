@@ -70,6 +70,5 @@ Since contact ground truth is hard to measure on hardware, we study this questio
 
 \paragraph{Evaluation.} All policies are evaluated zero-shot in SuperDex on the same objects and initial states. Following PenSpin, we report full rotations per episode and time until the pen drops, and we report the per-link contact F1 of $f$ on held-out replays. For RQ2 and RQ3, methods that use target data receive the same budget of 10, 25, 50 or 100 replays. Our baselines are the proprio-only student, a raw-contact student without alignment, contact randomization (noise, dropout and delay), parametric threshold-and-delay calibration~\citep{real2sim2real2026}, and PenSpin-style fine-tuning on the successful replays~\citep{wang2024penspin}. As an upper reference, we also train $f$ on state-matched pairs obtained by resetting SuperDex to Isaac Gym's state at every step, which is possible only between simulators. For RQ1, comparing the proprio-only and contact-aware students while varying friction and compliance shows how much of the transfer gap comes from contact observations rather than contact dynamics. Ablations cover the inputs and history length of $f$ and the use of failed replays.
 
-\acknowledgments{AI tools assisted with editing and LaTeX formatting.}
 \bibliography{refs}
 \end{document}
